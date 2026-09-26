@@ -1025,7 +1025,7 @@ jobs:
             ];
             const wasms=fs.readdirSync('contracts/target/wasm32-unknown-unknown/release').filter(f=>f.endsWith('.wasm'));
             for (const w of wasms) subjects.push({name:w,digest:{sha256:sha256('contracts/target/wasm32-unknown-unknown/release/'+w)}});
-            const pred={'_type':'https://in-toto.io/Statement/v1',subjects,
+            const pred={'_type':'https://in-toto.io/Statement/v1',subject: subjects,
               predicateType:'https://slsa.dev/provenance/v1',
               predicate:{buildDefinition:{
                 buildType:'https://github.com/slsa-framework/slsa-github-generator/generic@v1',
@@ -1253,7 +1253,7 @@ jobs:
               {name:path.basename('${{ steps.cyclonedx.outputs.cdx-json }}'),digest:{sha256:sha256('${{ steps.cyclonedx.outputs.cdx-json }}')}},
               {name:path.basename('${{ steps.spdx.outputs.spdx-file }}'),digest:{sha256:sha256('${{ steps.spdx.outputs.spdx-file }}')}}
             ];
-            const pred={'_type':'https://in-toto.io/Statement/v1',subjects,
+            const pred={'_type':'https://in-toto.io/Statement/v1',subject: subjects,
               predicateType:'https://slsa.dev/provenance/v1',
               predicate:{buildDefinition:{
                 buildType:'https://github.com/slsa-framework/slsa-github-generator/generic@v1',
