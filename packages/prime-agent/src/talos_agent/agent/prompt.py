@@ -2,12 +2,44 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from talos_agent.agent.context import AgentContext
 
 if TYPE_CHECKING:
     from talos_agent.config import Settings
+
+#: Maximum length for a single operator-supplied prompt field.
+_FIELD_MAX_LEN = 2000
+
+
+def _sanitise_field(value: Any) -> str:
+    """Normalise an operator-supplied field for prompt embedding.
+
+    Strips C0/C1 control characters and caps the length at
+    ``_FIELD_MAX_LEN`` so a hostile or malformed config value cannot inject
+    instructions or flood the prompt.
+    """
+    text = "" if value is None else str(value)
+    text = "".join(ch for ch in text if ord(ch) >= 32 and not 0x7F <= ord(ch) <= 0x9F)
+    if len(text) > _FIELD_MAX_LEN:
+        text = text[: _FIELD_MAX_LEN - 1] + "…"
+    return text
+
+
+def _delimit_field(field: str, value: str) -> str:
+    """Wrap a sanitised value in ``<<<DATA:field>>>…<<<END:field>>>`` fences.
+
+    Any ``<<<`` sequence inside the value is entity-escaped so the block
+    cannot be broken out of by an embedded end delimiter.
+    """
+    body = value.replace("<<<", "&lt;&lt;&lt;")
+    return f"<<<DATA:{field}>>>\n{body}\n<<<END:{field}>>>"
+
+
+def _safe_field(talos_config: dict, key: str, default: Any = "") -> str:
+    """Sanitise and delimit one operator-supplied ``talos_config`` field."""
+    return _delimit_field(key, _sanitise_field(talos_config.get(key, default)))
 
 
 def build_learning_prompt(talos_config: dict, context: AgentContext) -> str:
@@ -62,10 +94,18 @@ def build_system_prompt(
             instructions are excluded.  Set ``demo_commerce_mode=True`` to
             reproduce the original demo guidance.
     """
-    name = talos_config.get("name", "Unknown Talos")
-    persona = talos_config.get("persona", "a professional marketing agent")
-    target = talos_config.get("targetAudience", "general audience")
-    tone = talos_config.get("toneVoice", "professional and engaging")
+    name = _sanitise_field(talos_config.get("name", "Unknown Talos"))
+    name_block = _safe_field(talos_config, "name", "Unknown Talos")
+    persona_block = _safe_field(
+        talos_config, "persona", "a professional marketing agent"
+    )
+    target_block = _safe_field(
+        talos_config, "targetAudience", "general audience"
+    )
+    tone_block = _safe_field(
+        talos_config, "toneVoice", "professional and engaging"
+    )
+    description_block = _safe_field(talos_config, "description", "")
     channels = talos_config.get("channels", ["X"])
     threshold = talos_config.get("approvalThreshold", 10)
     gtm_budget = talos_config.get("gtmBudget", 200)
